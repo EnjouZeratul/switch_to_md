@@ -2,15 +2,9 @@
  * Image adapter - requires vision plugin
  */
 
-import type { ConvertOptions } from '../types';
+import type { ConvertOptions, VisionPlugin } from '../types';
 import { getVisionConfig } from '../config';
 import { VisionNotConfiguredError } from '../errors';
-
-// Plugin interface
-interface VisionPlugin {
-  name: string;
-  analyze(buffer: Buffer, options?: any): Promise<{ text: string; description?: string }>;
-}
 
 // Cached plugin instance
 let visionPlugin: VisionPlugin | null = null;
@@ -27,8 +21,16 @@ export function registerVisionPlugin(plugin: VisionPlugin): void {
  */
 export async function parseImage(
   buffer: Buffer,
-  options?: ConvertOptions
+  options?: ConvertOptions,
+  signal?: AbortSignal
 ): Promise<{ content: string; metadata?: Record<string, any> }> {
+  // Check abort signal
+  if (signal?.aborted) {
+    const error = new Error('Image analysis cancelled');
+    error.name = 'AbortError';
+    throw error;
+  }
+
   // Try to get plugin
   const plugin = await getVisionPlugin();
 
@@ -39,10 +41,18 @@ export async function parseImage(
   // Get configuration
   const config = getVisionConfig();
 
+  // Build analyze options - use config lang if no specific image options
+  const analyzeOptions = {
+    lang: config?.lang || ['en'],
+    apiKey: config?.apiKey,
+    baseUrl: config?.baseUrl,
+    model: config?.model,
+    depth: 'visual-semantic',
+    signal,
+  };
+
   // Analyze image
-  const result = await plugin.analyze(buffer, {
-    lang: options?.images ? undefined : config?.lang,
-  });
+  const result = await plugin.analyze(buffer, analyzeOptions);
 
   // Build markdown output
   const lines: string[] = ['# Image\n'];

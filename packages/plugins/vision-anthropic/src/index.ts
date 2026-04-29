@@ -10,6 +10,7 @@ interface AnalyzeOptions {
   model?: string;
   lang?: string[];
   depth?: 'ocr' | 'visual-semantic';
+  signal?: AbortSignal;
 }
 
 interface AnalyzeResult {
@@ -22,8 +23,16 @@ interface AnalyzeResult {
 class VisionAnthropicPlugin {
   name = 'vision-anthropic';
   private client: Anthropic | null = null;
+  private lastOptions: AnalyzeOptions | null = null;
 
   async analyze(buffer: Buffer, options?: AnalyzeOptions): Promise<AnalyzeResult> {
+    // Check abort signal
+    if (options?.signal?.aborted) {
+      const error = new Error('Vision analysis cancelled');
+      error.name = 'AbortError';
+      throw error;
+    }
+
     const client = this.getClient(options);
 
     // Convert buffer to base64
@@ -68,11 +77,17 @@ class VisionAnthropicPlugin {
   }
 
   private getClient(options?: AnalyzeOptions): Anthropic {
-    if (!this.client) {
+    // Re-create client if options changed (different apiKey, baseUrl)
+    const optionsChanged = !this.lastOptions ||
+      this.lastOptions.apiKey !== options?.apiKey ||
+      this.lastOptions.baseUrl !== options?.baseUrl;
+
+    if (!this.client || optionsChanged) {
       this.client = new Anthropic({
         apiKey: options?.apiKey || process.env.ANTHROPIC_API_KEY,
         baseURL: options?.baseUrl,
       });
+      this.lastOptions = options || {};
     }
     return this.client;
   }

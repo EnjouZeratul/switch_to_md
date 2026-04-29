@@ -2,8 +2,6 @@
  * PDF adapter
  */
 
-import type { ConvertOptions } from '../types';
-
 // Dynamic import for pdf-parse (ESM compatibility)
 let pdfParse: any = null;
 
@@ -16,7 +14,7 @@ async function getPdfParse() {
 
 export async function parsePDF(
   buffer: Buffer,
-  _options?: ConvertOptions
+  signal?: AbortSignal
 ): Promise<{ content: string; metadata?: Record<string, any> }> {
   const parse = await getPdfParse();
 

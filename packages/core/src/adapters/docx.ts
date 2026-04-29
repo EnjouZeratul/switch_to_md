@@ -2,8 +2,6 @@
  * DOCX adapter using mammoth
  */
 
-import type { ConvertOptions } from '../types';
-
 let mammoth: any = null;
 
 async function getMammoth() {
@@ -15,7 +13,7 @@ async function getMammoth() {
 
 export async function parseDOCX(
   buffer: Buffer,
-  _options?: ConvertOptions
+  signal?: AbortSignal
 ): Promise<{ content: string; metadata?: Record<string, any> }> {
   const lib = await getMammoth();
 

@@ -2,8 +2,6 @@
  * PPTX adapter
  */
 
-import type { ConvertOptions } from '../types';
-
 let AdmZip: any = null;
 let xml2js: any = null;
 
@@ -19,7 +17,7 @@ async function getLibs() {
 
 export async function parsePPTX(
   buffer: Buffer,
-  _options?: ConvertOptions
+  signal?: AbortSignal
 ): Promise<{ content: string; metadata?: Record<string, any> }> {
   const { AdmZip, xml2js } = await getLibs();
 

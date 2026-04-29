@@ -3,7 +3,7 @@
  */
 
 import OpenAI from 'openai';
-import { writeFileSync, unlinkSync, mkdtempSync } from 'fs';
+import { writeFileSync, unlinkSync, rmdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -12,6 +12,7 @@ interface TranscribeOptions {
   baseUrl?: string;
   lang?: string;
   timestamps?: boolean;
+  signal?: AbortSignal;
 }
 
 interface TranscribeResult {
@@ -22,8 +23,16 @@ interface TranscribeResult {
 class AudioOpenAIPlugin {
   name = 'audio-openai';
   private client: OpenAI | null = null;
+  private lastOptions: TranscribeOptions | null = null;
 
   async transcribe(buffer: Buffer, options?: TranscribeOptions): Promise<TranscribeResult> {
+    // Check abort signal
+    if (options?.signal?.aborted) {
+      const error = new Error('Transcription cancelled');
+      error.name = 'AbortError';
+      throw error;
+    }
+
     const client = this.getClient(options);
 
     // Write buffer to temp file (OpenAI API requires file)
@@ -34,10 +43,7 @@ class AudioOpenAIPlugin {
       writeFileSync(audioPath, buffer);
 
       // Create File-like object
-      const file = await import('fs').then(fs => {
-        const stats = fs.statSync(audioPath);
-        return new File([buffer], 'audio.mp3', { type: 'audio/mpeg' });
-      });
+      const file = new File([buffer], 'audio.mp3', { type: 'audio/mpeg' });
 
       // Call Whisper API
       const transcription = await client.audio.transcriptions.create({
@@ -61,18 +67,31 @@ class AudioOpenAIPlugin {
 
       return { text, segments };
     } finally {
+      // Clean up temp files and directory
       try {
-        unlinkSync(audioPath);
+        if (existsSync(audioPath)) {
+          unlinkSync(audioPath);
+        }
+        // Try to remove temp directory if empty
+        try {
+          rmdirSync(tempDir);
+        } catch {}
       } catch {}
     }
   }
 
   private getClient(options?: TranscribeOptions): OpenAI {
-    if (!this.client) {
+    // Re-create client if options changed (different apiKey, baseUrl)
+    const optionsChanged = !this.lastOptions ||
+      this.lastOptions.apiKey !== options?.apiKey ||
+      this.lastOptions.baseUrl !== options?.baseUrl;
+
+    if (!this.client || optionsChanged) {
       this.client = new OpenAI({
         apiKey: options?.apiKey || process.env.OPENAI_API_KEY,
         baseURL: options?.baseUrl,
       });
+      this.lastOptions = options || {};
     }
     return this.client;
   }

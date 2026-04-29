@@ -2,7 +2,7 @@
  * File type detection
  */
 
-import { statSync, readFileSync } from 'fs';
+import { statSync, openSync, readSync, closeSync, alloc } from 'fs';
 import { extname } from 'path';
 import type { FileType, FileInfo } from './types';
 
@@ -102,10 +102,14 @@ export function detectFileType(input: string | Buffer): DetectResult {
 
     // Try to read first few bytes for magic number detection
     try {
-      const fd = require('fs').openSync(input, 'r');
+      const fd = openSync(input, 'r');
       buffer = Buffer.alloc(32);
-      require('fs').readSync(fd, buffer, 0, 32, 0);
-      require('fs').closeSync(fd);
+      try {
+        readSync(fd, buffer, 0, 32, 0);
+      } finally {
+        // Always close fd, even if readSync fails
+        closeSync(fd);
+      }
     } catch {
       // File doesn't exist or can't be read, rely on extension
     }

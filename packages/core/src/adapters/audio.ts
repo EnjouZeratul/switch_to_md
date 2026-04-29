@@ -2,15 +2,9 @@
  * Audio adapter - requires audio plugin
  */
 
-import type { ConvertOptions } from '../types';
+import type { ConvertOptions, AudioPlugin } from '../types';
 import { getAudioConfig } from '../config';
 import { AudioNotConfiguredError } from '../errors';
-
-// Plugin interface
-interface AudioPlugin {
-  name: string;
-  transcribe(buffer: Buffer, options?: any): Promise<{ text: string; segments?: Array<{ start: number; end: number; text: string }> }>;
-}
 
 // Cached plugin instance
 let audioPlugin: AudioPlugin | null = null;
@@ -27,8 +21,16 @@ export function registerAudioPlugin(plugin: AudioPlugin): void {
  */
 export async function parseAudio(
   buffer: Buffer,
-  options?: ConvertOptions
+  options?: ConvertOptions,
+  signal?: AbortSignal
 ): Promise<{ content: string; metadata?: Record<string, any> }> {
+  // Check abort signal
+  if (signal?.aborted) {
+    const error = new Error('Audio transcription cancelled');
+    error.name = 'AbortError';
+    throw error;
+  }
+
   // Try to get plugin
   const plugin = await getAudioPlugin();
 
@@ -39,11 +41,18 @@ export async function parseAudio(
   // Get configuration
   const config = getAudioConfig();
 
-  // Transcribe audio
-  const result = await plugin.transcribe(buffer, {
-    lang: config?.lang,
+  // Build transcribe options
+  const transcribeOptions = {
+    lang: config?.lang || 'en',
     timestamps: true,
-  });
+    apiKey: config?.apiKey,
+    baseUrl: config?.baseUrl,
+    model: config?.model,
+    signal,
+  };
+
+  // Transcribe audio
+  const result = await plugin.transcribe(buffer, transcribeOptions);
 
   // Build markdown output
   const lines: string[] = ['# Audio Transcription\n'];

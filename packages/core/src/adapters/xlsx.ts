@@ -2,8 +2,6 @@
  * XLSX adapter using xlsx library
  */
 
-import type { ConvertOptions } from '../types';
-
 let XLSX: any = null;
 
 async function getXLSX() {
@@ -15,7 +13,7 @@ async function getXLSX() {
 
 export async function parseXLSX(
   buffer: Buffer,
-  _options?: ConvertOptions
+  signal?: AbortSignal
 ): Promise<{ content: string; metadata?: Record<string, any> }> {
   const lib = await getXLSX();
 

@@ -7,6 +7,7 @@ import { createWorker, type Worker } from 'tesseract.js';
 interface AnalyzeOptions {
   lang?: string[];
   depth?: 'ocr' | 'visual-semantic';
+  signal?: AbortSignal;
 }
 
 interface AnalyzeResult {
@@ -19,6 +20,13 @@ class VisionLocalPlugin {
   private workers: Map<string, Worker> = new Map();
 
   async analyze(buffer: Buffer, options?: AnalyzeOptions): Promise<AnalyzeResult> {
+    // Check abort signal
+    if (options?.signal?.aborted) {
+      const error = new Error('OCR analysis cancelled');
+      error.name = 'AbortError';
+      throw error;
+    }
+
     const langs = options?.lang || ['eng'];
     const langKey = langs.sort().join('+');
 

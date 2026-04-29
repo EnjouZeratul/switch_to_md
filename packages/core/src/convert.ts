@@ -2,18 +2,21 @@
  * Main convert function
  */
 
-import { readFile, writeFile } from 'fs/promises';
+import { readFile, writeFile, statSync } from 'fs/promises';
 import { basename, dirname, join, extname } from 'path';
 import fg from 'fast-glob';
 import { detectFileType, fileExists } from './detect';
 import { getAdapter, needsPlugin, getSupportedFormats } from './router';
-import { getVisionConfig, getAudioConfig } from './config';
+import { getVisionConfig, getAudioConfig, getConfig } from './config';
 import { normalize } from './normalize';
+import { configureCache, generateCacheKey, getCached, setCached, isCacheEnabled } from './cache';
 import {
   UnsupportedFormatError,
   VisionNotConfiguredError,
   AudioNotConfiguredError,
   FileNotFoundError,
+  CorruptedFileError,
+  type CorruptedWarning,
 } from './errors';
 import type { ConvertOptions, BatchResult, ProgressInfo, ConvertResult, FileType } from './types';
 
@@ -39,6 +42,15 @@ export async function convert(
   input: string | string[] | Buffer,
   options?: ConvertOptions
 ): Promise<string | BatchResult> {
+  // Configure cache if options provided
+  if (options?.cache) {
+    if (typeof options.cache === 'boolean') {
+      configureCache({ enabled: options.cache });
+    } else {
+      configureCache(options.cache);
+    }
+  }
+
   // Handle buffer input
   if (Buffer.isBuffer(input)) {
     const result = await convertBuffer(input, options);
@@ -78,6 +90,9 @@ async function convertFile(
   path: string,
   options?: ConvertOptions
 ): Promise<ConvertResult> {
+  // Check for abort signal
+  checkAbortSignal(options?.signal, 'Conversion cancelled before starting');
+
   // Check file exists
   if (!fileExists(path)) {
     throw new FileNotFoundError(path);
@@ -109,23 +124,53 @@ async function convertFile(
   const buffer = await readFile(path);
   const filename = basename(path);
 
+  // Check cache
+  if (isCacheEnabled()) {
+    const config = getConfig();
+    const configHash = JSON.stringify({
+      provider: config.provider,
+      vision: config.vision,
+      audio: config.audio,
+    });
+    const cacheKey = generateCacheKey(path, buffer, configHash);
+    const cached = getCached(cacheKey);
+
+    if (cached) {
+      if (options?.onProgress) {
+        options.onProgress({ percent: 100, stage: 'cached', message: 'From cache' });
+      }
+      return {
+        content: cached.content,
+        source: path,
+        type: detected.type,
+        warnings: cached.metadata?.warnings,
+      };
+    }
+  }
+
   // Report progress
   if (options?.onProgress) {
     options.onProgress({ percent: 10, stage: 'detect', message: `Detected: ${detected.type}` });
   }
 
   // Get adapter and parse
-  const adapter = getAdapter(detected.type);
   let rawContent: string;
   let metadata: Record<string, any> = {};
+
+  // Check abort signal before parsing
+  checkAbortSignal(options?.signal, 'Conversion cancelled during parsing');
 
   const parsed = await parseWithAdapter(detected.type, buffer, {
     filename,
     options,
     detected,
+    signal: options?.signal,
   });
   rawContent = parsed.content;
   metadata = parsed.metadata || {};
+
+  // Check abort signal before normalization
+  checkAbortSignal(options?.signal, 'Conversion cancelled during normalization');
 
   // Report progress
   if (options?.onProgress) {
@@ -138,6 +183,25 @@ async function convertFile(
     backend: metadata.backend,
     warnings: metadata.warnings,
   });
+
+  // Store in cache if enabled
+  if (isCacheEnabled()) {
+    const config = getConfig();
+    const configHash = JSON.stringify({
+      provider: config.provider,
+      vision: config.vision,
+      audio: config.audio,
+    });
+    const cacheKey = generateCacheKey(path, buffer, configHash);
+    setCached(cacheKey, {
+      content: normalized.content,
+      metadata: {
+        source: path,
+        type: detected.type,
+        timestamp: Date.now(),
+      },
+    });
+  }
 
   // Report progress
   if (options?.onProgress) {
@@ -159,6 +223,9 @@ async function convertBuffer(
   buffer: Buffer,
   options?: ConvertOptions
 ): Promise<ConvertResult> {
+  // Check for abort signal
+  checkAbortSignal(options?.signal, 'Conversion cancelled');
+
   const detected = detectFileType(buffer);
 
   if (detected.type === 'unknown') {
@@ -177,6 +244,7 @@ async function convertBuffer(
     filename: 'buffer',
     options,
     detected,
+    signal: options?.signal,
   });
 
   const normalized = normalize(parsed.content, 'buffer', detected.type, {
@@ -201,19 +269,32 @@ async function convertBatch(
   const results: Record<string, string> = {};
   const errors: Record<string, Error> = {};
 
-  for (const file of files) {
+  for (let i = 0; i < files.length; i++) {
+    // Check abort signal between files
+    checkAbortSignal(options?.signal, 'Batch conversion cancelled');
+
     try {
-      const result = await convertFile(file, options);
-      const filename = basename(file);
+      const result = await convertFile(files[i], options);
+      const filename = basename(files[i]);
       results[filename] = result.content;
 
       // Write to outputDir if specified
       if (options?.outputDir) {
-        const outputPath = join(options.outputDir, `${basename(file, extname(file))}.md`);
+        const outputPath = join(options.outputDir, `${basename(files[i], extname(files[i]))}.md`);
         await writeFile(outputPath, result.content, 'utf-8');
       }
+
+      // Report batch progress
+      if (options?.onProgress) {
+        const percent = Math.round(((i + 1) / files.length) * 100);
+        options.onProgress({
+          percent,
+          stage: 'batch',
+          message: `Processed ${i + 1}/${files.length} files`
+        });
+      }
     } catch (error) {
-      errors[file] = error as Error;
+      errors[files[i]] = error as Error;
     }
   }
 
@@ -238,17 +319,21 @@ async function parseWithAdapter(
     filename: string;
     options?: ConvertOptions;
     detected: ReturnType<typeof detectFileType>;
+    signal?: AbortSignal;
   }
 ): Promise<{ content: string; metadata?: Record<string, any> }> {
+  // Check abort signal before parsing
+  checkAbortSignal(context.signal, 'Conversion cancelled');
+
   switch (type) {
     case 'pdf':
-      return parsePDF(buffer);
+      return parsePDF(buffer, context.signal);
     case 'docx':
-      return parseDOCX(buffer);
+      return parseDOCX(buffer, context.signal);
     case 'xlsx':
-      return parseXLSX(buffer);
+      return parseXLSX(buffer, context.signal);
     case 'pptx':
-      return parsePPTX(buffer);
+      return parsePPTX(buffer, context.signal);
     case 'txt':
       return parseTXT(buffer);
     case 'html':
@@ -258,13 +343,24 @@ async function parseWithAdapter(
     case 'svg':
       return parseSVG(buffer);
     case 'image':
-      return parseImage(buffer, context.options);
+      return parseImage(buffer, context.options, context.signal);
     case 'audio':
-      return parseAudio(buffer, context.options);
+      return parseAudio(buffer, context.options, context.signal);
     case 'code':
       return parseCode(buffer, context.filename);
     default:
       throw new UnsupportedFormatError(type, getSupportedFormats());
+  }
+}
+
+/**
+ * Check if abort signal is triggered
+ */
+function checkAbortSignal(signal: AbortSignal | undefined, message: string): void {
+  if (signal?.aborted) {
+    const error = new Error(message);
+    error.name = 'AbortError';
+    throw error;
   }
 }
 
