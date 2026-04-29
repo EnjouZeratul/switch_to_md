@@ -1,0 +1,23 @@
+{
+  "name": "@switch-to-md/cli",
+  "version": "0.1.0",
+  "description": "CLI for switch-to-md",
+  "main": "dist/index.js",
+  "bin": {
+    "switch-to-md": "./dist/index.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs",
+    "dev": "tsup src/index.ts --format cjs --watch"
+  },
+  "dependencies": {
+    "commander": "^11.0.0",
+    "switch-to-md": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  }
+}

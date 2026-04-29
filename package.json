@@ -1,0 +1,38 @@
+{
+  "name": "switch-to-md",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Convert any file format to Markdown - A TypeScript library for AI agents",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "eslint packages/*/src",
+    "clean": "pnpm -r clean"
+  },
+  "keywords": [
+    "markdown",
+    "pdf-to-markdown",
+    "ocr",
+    "document-converter",
+    "ai",
+    "agent",
+    "vision",
+    "audio-transcription"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "eslint": "^8.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0"
+  }
+}
