@@ -3,7 +3,7 @@
  */
 
 import OpenAI from 'openai';
-import { writeFileSync, unlinkSync, rmdirSync, existsSync } from 'fs';
+import { writeFileSync, unlinkSync, rmdirSync, existsSync, mkdtempSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 

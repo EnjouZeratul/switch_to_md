@@ -2,7 +2,7 @@
  * File type detection
  */
 
-import { statSync, openSync, readSync, closeSync, alloc } from 'fs';
+import { statSync, openSync, readSync, closeSync } from 'fs';
 import { extname } from 'path';
 import type { FileType, FileInfo } from './types';
 

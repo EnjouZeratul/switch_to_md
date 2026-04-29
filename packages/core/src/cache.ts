@@ -3,9 +3,8 @@
  */
 
 import { createHash } from 'crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, statSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, statSync, readdirSync } from 'fs';
 import { join } from 'path';
-import { tmpdir } from 'os';
 
 interface CacheEntry {
   content: string;
@@ -127,8 +126,7 @@ export function clearCache(): void {
     return;
   }
 
-  const fs = require('fs');
-  const files = fs.readdirSync(cacheDir);
+  const files = readdirSync(cacheDir);
 
   for (const file of files) {
     if (file.endsWith('.json')) {
