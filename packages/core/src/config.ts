@@ -120,13 +120,13 @@ function getConfigFromEnv(): Config {
   }
 
   // Vision config from env
-  const visionConfig = getModuleConfigFromEnv('vision');
+  const visionConfig = getVisionConfigFromEnv();
   if (visionConfig) {
     config.vision = visionConfig;
   }
 
   // Audio config from env
-  const audioConfig = getModuleConfigFromEnv('audio');
+  const audioConfig = getAudioConfigFromEnv();
   if (audioConfig) {
     config.audio = audioConfig;
   }
@@ -134,16 +134,43 @@ function getConfigFromEnv(): Config {
   return config;
 }
 
-function getModuleConfigFromEnv(module: 'vision' | 'audio'): VisionConfig | AudioConfig | undefined {
-  const mapping = ENV_MAPPING[module];
+function getVisionConfigFromEnv(): VisionConfig | undefined {
+  const mapping = ENV_MAPPING.vision;
   const env = process.env;
 
   if (!env[mapping.provider] && !env[mapping.apiKey] && !env[mapping.baseUrl]) {
     return undefined;
   }
 
-  const config: VisionConfig | AudioConfig = {
-    provider: (env[mapping.provider] || 'openai') as any,
+  const config: VisionConfig = {
+    provider: (env[mapping.provider] || 'openai') as VisionConfig['provider'],
+  };
+
+  if (env[mapping.apiKey]) {
+    config.apiKey = env[mapping.apiKey];
+  }
+
+  if (env[mapping.model]) {
+    config.model = env[mapping.model];
+  }
+
+  if (env[mapping.baseUrl]) {
+    config.baseUrl = env[mapping.baseUrl];
+  }
+
+  return config;
+}
+
+function getAudioConfigFromEnv(): AudioConfig | undefined {
+  const mapping = ENV_MAPPING.audio;
+  const env = process.env;
+
+  if (!env[mapping.provider] && !env[mapping.apiKey] && !env[mapping.baseUrl]) {
+    return undefined;
+  }
+
+  const config: AudioConfig = {
+    provider: (env[mapping.provider] || 'openai') as AudioConfig['provider'],
   };
 
   if (env[mapping.apiKey]) {

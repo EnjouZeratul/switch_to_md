@@ -101,17 +101,20 @@ export function detectFileType(input: string | Buffer): DetectResult {
     ext = extname(input).toLowerCase();
 
     // Try to read first few bytes for magic number detection
+    let fd: number | undefined;
     try {
-      const fd = openSync(input, 'r');
+      fd = openSync(input, 'r');
       buffer = Buffer.alloc(32);
-      try {
-        readSync(fd, buffer, 0, 32, 0);
-      } finally {
-        // Always close fd, even if readSync fails
-        closeSync(fd);
-      }
+      readSync(fd, buffer, 0, 32, 0);
     } catch {
       // File doesn't exist or can't be read, rely on extension
+    } finally {
+      // Always close fd, even if readSync fails
+      if (fd !== undefined) {
+        try {
+          closeSync(fd);
+        } catch {}
+      }
     }
   } else {
     buffer = input;

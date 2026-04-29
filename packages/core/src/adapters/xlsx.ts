@@ -43,7 +43,9 @@ export async function parseXLSX(
       },
     };
   } catch (error) {
-    throw new Error(`Failed to parse XLSX: ${error instanceof Error ? error.message : String(error)}`);
+    const wrapped = new Error(`Failed to parse XLSX: ${error instanceof Error ? error.message : String(error)}`);
+    (wrapped as Error & { cause?: unknown }).cause = error;
+    throw wrapped;
   }
 }
 

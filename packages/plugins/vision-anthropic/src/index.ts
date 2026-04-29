@@ -28,9 +28,7 @@ class VisionAnthropicPlugin {
   async analyze(buffer: Buffer, options?: AnalyzeOptions): Promise<AnalyzeResult> {
     // Check abort signal
     if (options?.signal?.aborted) {
-      const error = new Error('Vision analysis cancelled');
-      error.name = 'AbortError';
-      throw error;
+      throw new Error('Vision analysis cancelled');
     }
 
     const client = this.getClient(options);
@@ -44,7 +42,7 @@ class VisionAnthropicPlugin {
 
     // Call Claude Vision API
     const response = await client.messages.create({
-      model: options?.model || 'claude-sonnet-4-20250514',
+      model: options?.model || 'claude-3-sonnet-20240229',
       max_tokens: 4096,
       messages: [
         {

@@ -4,10 +4,11 @@
 
 import type { ConvertOptions, AudioPlugin } from '../types';
 import { getAudioConfig } from '../config';
-import { AudioNotConfiguredError } from '../errors';
+import { AudioNotConfiguredError, AbortError } from '../errors';
 
 // Cached plugin instance
 let audioPlugin: AudioPlugin | null = null;
+let cachedAudioConfigHash: string | null = null;
 
 /**
  * Register an audio plugin
@@ -26,9 +27,7 @@ export async function parseAudio(
 ): Promise<{ content: string; metadata?: Record<string, any> }> {
   // Check abort signal
   if (signal?.aborted) {
-    const error = new Error('Audio transcription cancelled');
-    error.name = 'AbortError';
-    throw error;
+    throw new AbortError('Audio transcription cancelled');
   }
 
   // Try to get plugin
@@ -49,6 +48,7 @@ export async function parseAudio(
     baseUrl: config?.baseUrl,
     model: config?.model,
     signal,
+    timeout: config?.timeout,
   };
 
   // Transcribe audio
@@ -86,11 +86,17 @@ export async function parseAudio(
  * Get or load audio plugin
  */
 async function getAudioPlugin(): Promise<AudioPlugin | null> {
-  if (audioPlugin) {
+  const config = getAudioConfig();
+  const configHash = JSON.stringify(config);
+
+  // Return cached plugin if config hasn't changed
+  if (audioPlugin && cachedAudioConfigHash === configHash) {
     return audioPlugin;
   }
 
-  const config = getAudioConfig();
+  // Config changed or no plugin cached - reload
+  audioPlugin = null;
+  cachedAudioConfigHash = configHash;
 
   if (!config) {
     return null;
@@ -103,8 +109,11 @@ async function getAudioPlugin(): Promise<AudioPlugin | null> {
         const module = await import('@switch-to-md/audio-openai');
         audioPlugin = module.default || module;
         return audioPlugin;
-      } catch {
-        return null;
+      } catch (error) {
+        throw new Error(
+          `Failed to load @switch-to-md/audio-openai: ${(error as Error).message}. ` +
+          `Please install it: npm install @switch-to-md/audio-openai`
+        );
       }
 
     case 'local':
@@ -112,8 +121,11 @@ async function getAudioPlugin(): Promise<AudioPlugin | null> {
         const module = await import('@switch-to-md/audio-local');
         audioPlugin = module.default || module;
         return audioPlugin;
-      } catch {
-        return null;
+      } catch (error) {
+        throw new Error(
+          `Failed to load @switch-to-md/audio-local: ${(error as Error).message}. ` +
+          `Please install it: npm install @switch-to-md/audio-local`
+        );
       }
 
     case 'custom':

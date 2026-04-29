@@ -70,17 +70,27 @@ function generateFrontmatter(data: Record<string, any>): string {
  */
 function formatValue(value: any): string {
   if (typeof value === 'string') {
-    // Simple strings don't need quotes
-    if (/^[a-zA-Z0-9_\-./]+$/.test(value)) {
+    // Use JSON.stringify for proper escaping - JSON strings are valid YAML
+    if (/^[a-zA-Z0-9_\-./:@]+$/.test(value)) {
       return value;
     }
-    return `"${value}"`;
+    return JSON.stringify(value);
   }
   if (typeof value === 'number') {
     return String(value);
   }
+  if (typeof value === 'boolean') {
+    return String(value);
+  }
+  if (value === null) {
+    return 'null';
+  }
   if (Array.isArray(value)) {
     return `[${value.map(formatValue).join(', ')}]`;
+  }
+  if (typeof value === 'object') {
+    // Handle nested objects by converting to JSON
+    return JSON.stringify(value);
   }
   return String(value);
 }

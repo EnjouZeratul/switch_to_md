@@ -3,7 +3,7 @@
  */
 
 import OpenAI from 'openai';
-import { writeFileSync, unlinkSync, rmdirSync, existsSync, mkdtempSync } from 'fs';
+import { writeFileSync, unlinkSync, rmSync, existsSync, mkdtempSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -28,9 +28,7 @@ class AudioOpenAIPlugin {
   async transcribe(buffer: Buffer, options?: TranscribeOptions): Promise<TranscribeResult> {
     // Check abort signal
     if (options?.signal?.aborted) {
-      const error = new Error('Transcription cancelled');
-      error.name = 'AbortError';
-      throw error;
+      throw new Error('Transcription cancelled');
     }
 
     const client = this.getClient(options);
@@ -67,15 +65,11 @@ class AudioOpenAIPlugin {
 
       return { text, segments };
     } finally {
-      // Clean up temp files and directory
+      // Clean up temp directory recursively
       try {
-        if (existsSync(audioPath)) {
-          unlinkSync(audioPath);
+        if (existsSync(tempDir)) {
+          rmSync(tempDir, { recursive: true, force: true });
         }
-        // Try to remove temp directory if empty
-        try {
-          rmdirSync(tempDir);
-        } catch {}
       } catch {}
     }
   }

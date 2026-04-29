@@ -2,6 +2,8 @@
  * PPTX adapter
  */
 
+import { AbortError } from '../errors';
+
 let AdmZip: any = null;
 let xml2js: any = null;
 
@@ -37,6 +39,11 @@ export async function parsePPTX(
     const slides: string[] = [];
 
     for (const entry of slideEntries) {
+      // Check abort signal between slides
+      if (signal?.aborted) {
+        throw new AbortError('PPTX parsing cancelled');
+      }
+
       const xmlContent = zip.readAsText(entry);
       const slideContent = await parseSlideXML(xmlContent, xml2js);
       slides.push(slideContent);
@@ -58,7 +65,9 @@ export async function parsePPTX(
       },
     };
   } catch (error) {
-    throw new Error(`Failed to parse PPTX: ${error instanceof Error ? error.message : String(error)}`);
+    const wrapped = new Error(`Failed to parse PPTX: ${error instanceof Error ? error.message : String(error)}`);
+    (wrapped as Error & { cause?: unknown }).cause = error;
+    throw wrapped;
   }
 }
 

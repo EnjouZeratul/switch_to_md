@@ -53,7 +53,9 @@ export async function parsePDF(
       },
     };
   } catch (error) {
-    throw new Error(`Failed to parse PDF: ${error instanceof Error ? error.message : String(error)}`);
+    const wrapped = new Error(`Failed to parse PDF: ${error instanceof Error ? error.message : String(error)}`);
+    (wrapped as Error & { cause?: unknown }).cause = error;
+    throw wrapped;
   }
 }
 

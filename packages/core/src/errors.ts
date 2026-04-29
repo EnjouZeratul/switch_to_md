@@ -117,6 +117,63 @@ export class CorruptedFileError extends SwitchToMdError {
   }
 }
 
+/** File too large */
+export class FileTooLargeError extends SwitchToMdError {
+  size: number;
+  maxSize: number;
+
+  constructor(size: number, maxSize: number) {
+    super(
+      `File too large: ${formatBytes(size)} (max: ${formatBytes(maxSize)})`,
+      'FILE_TOO_LARGE',
+      'Use the maxFileSize option to increase the limit, or process a smaller file.'
+    );
+    this.name = 'FileTooLargeError';
+    this.size = size;
+    this.maxSize = maxSize;
+  }
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+/** Abort error for cancellation */
+export class AbortError extends Error {
+  constructor(message: string = 'Operation aborted') {
+    super(message);
+    this.name = 'AbortError';
+  }
+}
+
+/** Sanitize sensitive information from error messages */
+export function sanitizeError(error: Error): Error {
+  let message = error.message;
+
+  // Redact OpenAI API keys (sk-...)
+  message = message.replace(/sk-[a-zA-Z0-9]{20,}/g, '***REDACTED-OPENAI-KEY***');
+
+  // Redact Anthropic API keys (sk-ant-...)
+  message = message.replace(/sk-ant-[a-zA-Z0-9_-]+/gi, '***REDACTED-ANTHROPIC-KEY***');
+
+  // Redact generic API keys in common formats
+  message = message.replace(/(['"']?(?:api[_-]?key|apikey|key)['"']?\s*[:=]\s*)['"'][a-zA-Z0-9_-]{16,}['"']/gi, '$1***REDACTED***');
+
+  if (message === error.message) {
+    return error;
+  }
+
+  const sanitized = new Error(message);
+  sanitized.name = error.name;
+  sanitized.stack = error.stack;
+  (sanitized as Error & { cause?: unknown }).cause = (error as Error & { cause?: unknown }).cause;
+  return sanitized;
+}
+
 export interface CorruptedWarning {
   type: 'corrupted_page' | 'missing_image' | 'encoding_error';
   location: string;

@@ -4,7 +4,8 @@
 
 // Main API
 export { convert, type ConvertOptions, type BatchResult, type ProgressInfo } from './convert';
-export { configure, defineConfig, type Config, type VisionConfig, type AudioConfig } from './config';
+export { configure, defineConfig } from './config';
+export type { Config, VisionConfig, AudioConfig } from './types';
 
 // Error types
 export {
@@ -15,6 +16,9 @@ export {
   FileNotFoundError,
   ApiKeyInvalidError,
   CorruptedFileError,
+  FileTooLargeError,
+  AbortError,
+  sanitizeError,
   type CorruptedWarning
 } from './errors';
 

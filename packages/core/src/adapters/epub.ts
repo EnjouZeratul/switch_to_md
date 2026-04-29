@@ -2,6 +2,8 @@
  * EPUB adapter
  */
 
+import { AbortError } from '../errors';
+
 let AdmZip: any = null;
 let linkedom: any = null;
 
@@ -23,9 +25,7 @@ export async function parseEPUB(
 
   // Check abort signal
   if (signal?.aborted) {
-    const error = new Error('EPUB parsing cancelled');
-    error.name = 'AbortError';
-    throw error;
+    throw new AbortError('EPUB parsing cancelled');
   }
 
   try {
@@ -49,9 +49,7 @@ export async function parseEPUB(
     for (const chapter of chapters) {
       // Check abort signal between chapters
       if (signal?.aborted) {
-        const error = new Error('EPUB parsing cancelled');
-        error.name = 'AbortError';
-        throw error;
+        throw new AbortError('EPUB parsing cancelled');
       }
 
       const chapterPath = resolvePath(contentOpfPath, chapter.path);
@@ -71,10 +69,12 @@ export async function parseEPUB(
       },
     };
   } catch (error) {
-    if ((error as Error).name === 'AbortError') {
+    if (error instanceof AbortError || (error as Error).name === 'AbortError') {
       throw error;
     }
-    throw new Error(`Failed to parse EPUB: ${error instanceof Error ? error.message : String(error)}`);
+    const wrapped = new Error(`Failed to parse EPUB: ${error instanceof Error ? error.message : String(error)}`);
+    (wrapped as Error & { cause?: unknown }).cause = error;
+    throw wrapped;
   }
 }
 
@@ -130,8 +130,14 @@ function parseOPF(contentOpf: string, linkedom: any): { title: string; chapters:
 }
 
 function resolvePath(basePath: string, relativePath: string): string {
+  // Sanitize: remove any path traversal attempts
+  const sanitizedPath = relativePath.replace(/\.\.[/\\]/g, '').replace(/\.\.\\/g, '');
+
+  // Ensure path doesn't start with /
+  const cleanPath = sanitizedPath.replace(/^[\/\\]+/, '');
+
   const baseDir = basePath.split('/').slice(0, -1).join('/');
-  return baseDir ? `${baseDir}/${relativePath}` : relativePath;
+  return baseDir ? `${baseDir}/${cleanPath}` : cleanPath;
 }
 
 function xhtmlToMarkdown(xhtml: string, linkedom: any): string {

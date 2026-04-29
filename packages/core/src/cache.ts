@@ -12,6 +12,7 @@ interface CacheEntry {
     source: string;
     type: string;
     timestamp: number;
+    warnings?: any[];
   };
 }
 
@@ -60,7 +61,7 @@ export function generateCacheKey(
   if (configHash) {
     hash.update(configHash);
   }
-  return hash.digest('hex').slice(0, 32);
+  return hash.digest('hex');
 }
 
 /**

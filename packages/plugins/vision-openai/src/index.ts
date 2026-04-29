@@ -28,9 +28,7 @@ class VisionOpenAIPlugin {
   async analyze(buffer: Buffer, options?: AnalyzeOptions): Promise<AnalyzeResult> {
     // Check abort signal
     if (options?.signal?.aborted) {
-      const error = new Error('Vision analysis cancelled');
-      error.name = 'AbortError';
-      throw error;
+      throw new Error('Vision analysis cancelled');
     }
 
     const client = this.getClient(options);

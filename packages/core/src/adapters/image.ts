@@ -4,10 +4,11 @@
 
 import type { ConvertOptions, VisionPlugin } from '../types';
 import { getVisionConfig } from '../config';
-import { VisionNotConfiguredError } from '../errors';
+import { VisionNotConfiguredError, AbortError, sanitizeError } from '../errors';
 
 // Cached plugin instance
 let visionPlugin: VisionPlugin | null = null;
+let cachedVisionConfigHash: string | null = null;
 
 /**
  * Register a vision plugin
@@ -26,9 +27,7 @@ export async function parseImage(
 ): Promise<{ content: string; metadata?: Record<string, any> }> {
   // Check abort signal
   if (signal?.aborted) {
-    const error = new Error('Image analysis cancelled');
-    error.name = 'AbortError';
-    throw error;
+    throw new AbortError('Image analysis cancelled');
   }
 
   // Try to get plugin
@@ -49,6 +48,7 @@ export async function parseImage(
     model: config?.model,
     depth: 'visual-semantic',
     signal,
+    timeout: config?.timeout,
   };
 
   // Analyze image
@@ -81,25 +81,37 @@ export async function parseImage(
  * Get or load vision plugin
  */
 async function getVisionPlugin(): Promise<VisionPlugin | null> {
-  if (visionPlugin) {
+  const config = getVisionConfig();
+  const configHash = JSON.stringify(config);
+
+  // Return cached plugin if config hasn't changed
+  if (visionPlugin && cachedVisionConfigHash === configHash) {
     return visionPlugin;
   }
 
-  const config = getVisionConfig();
+  // Config changed or no plugin cached - reload
+  visionPlugin = null;
+  cachedVisionConfigHash = configHash;
 
   if (!config) {
     return null;
   }
 
   // Load appropriate plugin based on config
+  let lastError: Error | undefined;
+
   switch (config.provider) {
     case 'openai':
       try {
         const module = await import('@switch-to-md/vision-openai');
         visionPlugin = module.default || module;
         return visionPlugin;
-      } catch {
-        return null;
+      } catch (error) {
+        lastError = error as Error;
+        throw new Error(
+          `Failed to load @switch-to-md/vision-openai: ${lastError.message}. ` +
+          `Please install it: npm install @switch-to-md/vision-openai`
+        );
       }
 
     case 'anthropic':
@@ -107,8 +119,12 @@ async function getVisionPlugin(): Promise<VisionPlugin | null> {
         const module = await import('@switch-to-md/vision-anthropic');
         visionPlugin = module.default || module;
         return visionPlugin;
-      } catch {
-        return null;
+      } catch (error) {
+        lastError = error as Error;
+        throw new Error(
+          `Failed to load @switch-to-md/vision-anthropic: ${lastError.message}. ` +
+          `Please install it: npm install @switch-to-md/vision-anthropic`
+        );
       }
 
     case 'local':
@@ -116,8 +132,12 @@ async function getVisionPlugin(): Promise<VisionPlugin | null> {
         const module = await import('@switch-to-md/vision-local');
         visionPlugin = module.default || module;
         return visionPlugin;
-      } catch {
-        return null;
+      } catch (error) {
+        lastError = error as Error;
+        throw new Error(
+          `Failed to load @switch-to-md/vision-local: ${lastError.message}. ` +
+          `Please install it: npm install @switch-to-md/vision-local`
+        );
       }
 
     case 'custom':

@@ -2,6 +2,10 @@
  * Type definitions for switch_to_md
  */
 
+// Import from errors to avoid duplication
+import type { CorruptedWarning } from './errors';
+export type { CorruptedWarning };
+
 // ===== File Types =====
 export type FileType =
   | 'pdf'
@@ -39,6 +43,8 @@ export interface ConvertOptions {
   cache?: boolean | CacheOptions;
   /** Abort signal */
   signal?: AbortSignal;
+  /** Maximum file size in bytes (default: 100MB) */
+  maxFileSize?: number;
 }
 
 export interface ImageOptions {
@@ -68,12 +74,6 @@ export interface ConvertResult {
   source: string;
   type: FileType;
   warnings?: CorruptedWarning[];
-}
-
-export interface CorruptedWarning {
-  type: 'corrupted_page' | 'missing_image' | 'encoding_error';
-  location: string;
-  message: string;
 }
 
 // ===== Batch Result =====
@@ -112,6 +112,8 @@ export interface VisionConfig {
   lang?: string[];
   /** Custom provider specific */
   headers?: Record<string, string>;
+  /** Timeout in milliseconds */
+  timeout?: number;
 }
 
 export interface AudioConfig {
@@ -123,6 +125,8 @@ export interface AudioConfig {
   lang?: string;
   /** Custom provider specific */
   headers?: Record<string, string>;
+  /** Timeout in milliseconds */
+  timeout?: number;
 }
 
 // ===== Plugin Interface =====

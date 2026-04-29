@@ -2,7 +2,8 @@
  * Main convert function
  */
 
-import { readFile, writeFile, statSync } from 'fs/promises';
+import { readFile, writeFile } from 'fs/promises';
+import { statSync } from 'fs';
 import { basename, dirname, join, extname } from 'path';
 import fg from 'fast-glob';
 import { detectFileType, fileExists } from './detect';
@@ -16,6 +17,8 @@ import {
   AudioNotConfiguredError,
   FileNotFoundError,
   CorruptedFileError,
+  FileTooLargeError,
+  AbortError,
   type CorruptedWarning,
 } from './errors';
 import type { ConvertOptions, BatchResult, ProgressInfo, ConvertResult, FileType } from './types';
@@ -96,6 +99,13 @@ async function convertFile(
   // Check file exists
   if (!fileExists(path)) {
     throw new FileNotFoundError(path);
+  }
+
+  // Check file size
+  const stats = statSync(path);
+  const maxFileSize = options?.maxFileSize ?? 100 * 1024 * 1024; // Default 100MB
+  if (stats.size > maxFileSize) {
+    throw new FileTooLargeError(stats.size, maxFileSize);
   }
 
   // Detect file type
@@ -339,7 +349,7 @@ async function parseWithAdapter(
     case 'html':
       return parseHTML(buffer);
     case 'epub':
-      return parseEPUB(buffer);
+      return parseEPUB(buffer, context.signal);
     case 'svg':
       return parseSVG(buffer);
     case 'image':
@@ -358,9 +368,7 @@ async function parseWithAdapter(
  */
 function checkAbortSignal(signal: AbortSignal | undefined, message: string): void {
   if (signal?.aborted) {
-    const error = new Error(message);
-    error.name = 'AbortError';
-    throw error;
+    throw new AbortError(message);
   }
 }
 

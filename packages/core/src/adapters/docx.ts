@@ -46,7 +46,9 @@ export async function parseDOCX(
       },
     };
   } catch (error) {
-    throw new Error(`Failed to parse DOCX: ${error instanceof Error ? error.message : String(error)}`);
+    const wrapped = new Error(`Failed to parse DOCX: ${error instanceof Error ? error.message : String(error)}`);
+    (wrapped as Error & { cause?: unknown }).cause = error;
+    throw wrapped;
   }
 }
 

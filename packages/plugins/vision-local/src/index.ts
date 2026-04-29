@@ -18,14 +18,41 @@ interface AnalyzeResult {
 class VisionLocalPlugin {
   name = 'vision-local';
   private workers: Map<string, Worker> = new Map();
+  private cleanupRegistered = false;
+
+  private registerCleanup(): void {
+    if (this.cleanupRegistered) return;
+    this.cleanupRegistered = true;
+
+    const terminateWorkers = () => {
+      // Synchronous cleanup - don't wait
+      const workers = Array.from(this.workers.values());
+      this.workers.clear();
+      workers.forEach(w => {
+        try {
+          w.terminate();
+        } catch {}
+      });
+    };
+
+    process.on('exit', terminateWorkers);
+    process.on('SIGINT', () => {
+      terminateWorkers();
+      process.exit(0);
+    });
+    process.on('SIGTERM', () => {
+      terminateWorkers();
+      process.exit(0);
+    });
+  }
 
   async analyze(buffer: Buffer, options?: AnalyzeOptions): Promise<AnalyzeResult> {
     // Check abort signal
     if (options?.signal?.aborted) {
-      const error = new Error('OCR analysis cancelled');
-      error.name = 'AbortError';
-      throw error;
+      throw new Error('OCR analysis cancelled');
     }
+
+    this.registerCleanup();
 
     const langs = options?.lang || ['eng'];
     const langKey = langs.sort().join('+');
@@ -70,9 +97,10 @@ class VisionLocalPlugin {
   }
 
   async terminate(): Promise<void> {
-    for (const worker of this.workers.values()) {
-      await worker.terminate();
-    }
+    // Terminate all workers in parallel
+    await Promise.all(
+      Array.from(this.workers.values()).map(worker => worker.terminate())
+    );
     this.workers.clear();
   }
 }
