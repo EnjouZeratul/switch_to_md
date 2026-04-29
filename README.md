@@ -4,12 +4,12 @@
 
 ## 特性
 
-- 🚀 **一行代码搞定**：`convert('file.pdf')`
-- 📦 **轻量核心**：~500KB，无模型依赖
-- 🔧 **灵活配置**：环境变量 / 配置文件 / 代码配置
-- 🤖 **Agent 友好**：结构化 MD 输出，带 frontmatter
-- 🌐 **支持云端 & 本地**：OpenAI / Claude / 本地模型
-- 📄 **全格式覆盖**：PDF / Word / Excel / PPT / 图片 / 音频 / 代码
+- **一行代码搞定**：`convert('file.pdf')`
+- **轻量核心**：~500KB，无模型依赖
+- **灵活配置**：环境变量 / 配置文件 / 代码配置
+- **Agent 友好**：结构化 MD 输出，带 frontmatter
+- **支持云端 & 本地**：OpenAI / Claude / 本地模型
+- **全格式覆盖**：PDF / Word / Excel / PPT / 图片 / 音频 / 代码
 
 ## 安装
 
@@ -207,4 +207,4 @@ pnpm test
 
 ## License
 
-MIT
+AGPL-3.0

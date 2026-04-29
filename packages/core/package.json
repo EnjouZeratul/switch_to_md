@@ -21,7 +21,8 @@
     "clean": "rm -rf dist"
   },
   "keywords": ["markdown", "converter", "pdf", "ocr", "ai"],
-  "license": "MIT",
+  "author": "EnjouZeratul",
+  "license": "AGPL-3.0",
   "dependencies": {
     "pdf-parse": "^1.1.1",
     "mammoth": "^1.6.0",
